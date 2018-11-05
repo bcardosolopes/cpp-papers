@@ -1,12 +1,12 @@
 <pre class='metadata'>
 Title: <code>export module containing [​[attribute]​];</code>
 Shortname: P1245
-Revision: 0
+Revision: 1
 Audience: EWG
 Status: P
 Group: WG21
-URL: http://wg21.link/p1245r0
-!Source: <a href="https://github.com/bcardosolopes/cpp-papers/blob/master/p1245r0.bs">github.com/bcardosolopes/cpp-papers/blob/master/p1245r0.bs</a>
+<!-- URL: http://wg21.link/p1245r1-->
+!Source: <a href="https://github.com/bcardosolopes/cpp-papers/blob/master/d1245r1.bs">github.com/bcardosolopes/cpp-papers/blob/master/d1245r1.bs</a>
 Editor: Bruno Cardoso Lopes, Apple, blopes@apple.com
 Editor: JF Bastien, Apple, jfbastien@apple.com
 No abstract: true
@@ -173,31 +173,31 @@ EWGI Q&A {#ewgicom}
  Is there implementation experience?
 </blockquote>
 
- Not in the form of a language feature. However, *Clang Modules* has an analogous (but rudimentary) way of annotating requirements in *module maps* (clang's side file for modules specification), that work in very similar ways as an attribute would work at the module level. For example, it's currently possible to mark modules as `freestanding`, which will require the compiler invocation to contain `-ffreestanding` or the module won't be built otherwise. The same is true for checks like `opencl`, `gnuinlineasm` or `altivec` and also a handful of platform based checkings. See [[RequiresDeclaration]] for more information.
+ Not in the form of a language feature. However, *Clang Modules* has an analogous (but rudimentary) way of annotating requirements in *module maps* (clang's side file for modules specification), that work in very similar ways as an attribute would work at the module level declaration. For example, it's currently possible to mark modules as `freestanding`, which will require the `-ffreestanding` compiler flag to be used or the module won't build. The same is true for checks like `opencl`, `gnuinlineasm` or `altivec` and also a handful of platform based checks. See [[RequiresDeclaration]] for more information.
 
 <blockquote>
  Is there usage experience?
 </blockquote>
 
- In the *Clang Modules* way, yes, for a several years already. There are multiple examples used in Modules descriptions for libcxx headers, Clang builtin headers and in Apple's SDKs.
+ In *Clang Modules*, yes, for a several years already. There are multiple examples used in Modules descriptions for [[libcxxmodule|libc++ module]], Clang [[clangbuiltins|builtin headers]] and Apple's SDKs.
 
 <blockquote>
  What shipping vehicle do you target with this proposal?
 </blockquote>
 
- C++20. Why? We believe it provides a good mechanism for expressing constratins at coarse-grained level, which was not possible before modules. Shipping the mechanism in C++20 should allow for further exploration of module level attributes, by providing a mechanism for vendors to experiment.
+ C++20. Why? We believe it provides a good mechanism for expressing constraints at coarse-grained level, which was not possible before modules. Shipping the mechanism in C++20 should allow for further exploration of module level attributes, by providing a mechanism for vendors to experiment.
 
 <blockquote>
  Please show a Tony Table of the code before / after your proposal.
 </blockquote>
 
- Not relevant. In [[#proposal|Proposal]] we describe the additions to the language, examples are given in [[#study|Case Study]].
+ Not relevant here. In [[#proposal|Proposal]] we describe the additions to the language, examples are given in [[#study|Case Study]].
 
 <blockquote>
  This isn't providing a particular attribute, but rather suggesting that attributes could be applied to modules instead of as compiler flags. The committee in general would rather avoid attributes which change language semantics. Which compiler flags don't affect semantics yet would be good targets for standardization as module attributes? You have a list of attributes, are all of those semantics-preserving?
 </blockquote>
 
- Examples: `freestanding`, `-mno-implicit-float`, `-fvectorize`, `-fstack-protector`, `-ftls-model=<arg>` and `-mstack-alignment=<arg>`. This proposal will only cover potential attributes that are semantics-preserving, attributes which change language semantics, in general, should be discussed elsewhere.
+ Examples: `freestanding`, `-mno-implicit-float`, `-fvectorize`, `-fstack-protector`, `-ftls-model=<arg>`, `-mstack-alignment=<arg>`, etc. This proposal will only cover potential attributes that are semantics-preserving.
 
 <blockquote>
  Do you foresee ODR issues when linking different modules with different such attributes? If yes, can these be resolved?
@@ -238,9 +238,21 @@ EWGI Q&A {#ewgicom}
         "href": "http://wg21.link/p1246r0",
         "title": "The no_float function attribute"
     },
+    "libcxxmodule": {
+        "href": "https://github.com/llvm-mirror/libcxx/blob/6c372355ba83ad4899a66039f32fbca97204cff6/include/module.modulemap#L519",
+        "title": "Libcxx module map"
+    },
+    "clangbuiltins": {
+        "href": "https://github.com/llvm-mirror/clang/blob/a8770a7e8e8797a860773c2e0959274b1db4fc7a/lib/Headers/module.modulemap#L79",
+        "title": "Clang builtins module map"
+    },
     "RequiresDeclaration": {
         "href": "https://clang.llvm.org/docs/Modules.html#requires-declaration",
         "title": "Clang Modules documentation: Requires declaration"
     }
 }
 </pre>
+
+<!--
+-->
+
