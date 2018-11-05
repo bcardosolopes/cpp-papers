@@ -1,0 +1,206 @@
+<pre class='metadata'>
+Title: Disabling static destructors: introducing <code>no_destroy</code> and <code>always_destroy</code> attributes
+Shortname: P1247
+Revision: 1
+Audience: EWG
+Status: P
+Group: WG21
+<!-- URL: http://wg21.link/d1247r1 -->
+!Source: <a href="https://github.com/bcardosolopes/cpp-papers/blob/master/d1247r1.bs">github.com/bcardosolopes/cpp-papers/blob/master/d1247r1.bs</a>
+Editor: Bruno Cardoso Lopes, Apple, blopes@apple.com
+Editor: JF Bastien, Apple, jfbastien@apple.com
+Editor: Erik Pilkington, Apple, epilkington@apple.com
+No abstract: true
+Date: 2018-11-05
+Markup Shorthands: markdown yes
+<!--Toggle Diffs: yes-->
+</pre>
+
+r0 → r1 {#r0r1}
+-------
+
+- Add two new issues to [[#propsal|Proposed Solution]] to present alternative
+  approaches for attributes, semantics and proper keywords.
+
+Introduction {#intro}
+============
+
+The destruction of variables with static or thread local storage duration can
+introduce bugs and surprising behavior that is hard to anticipate, and isn't
+fully supported across all implementations of C++. Some of the issues include:
+
+  1. Teardown ordering: the order of destruction across translation units isn't
+     always the same.
+
+  1. Multithreaded teardown: crashes when the main thread is exiting the process
+     and calling destructors while a detached thread is still running and
+     accessing the destructing variables.
+
+  1. Shared code that is compiled both as an application and as a library. When
+     library mode is chosen, the same problems as above arise.
+
+  1. The operating system can reclaim many resources, particularly memory, faster
+     than the user can anyways.
+
+  1. In embedded platforms, it’s often the case that we know that static
+     destructors are never called. It would be useful to avoid emitting them
+     entirely to reduce the amount of generated code. Additionally, providing a
+     way to annotate this property inline in the source code improves
+     readability on these platforms.
+
+  1. [**basic.start.main**] currently says:
+     <blockquote>
+      It is implementation-defined whether a program in a freestanding
+      environment is required to define a `main` function. [ *Note*: In a
+      freestanding environment, start-up and termination is
+      implementation-defined; start-up contains the execution of constructors
+      for objects of namespace scope with static storage duration; termination
+      contains the execution of destructors for objects with static storage
+      duration. — *end note* ]
+     </blockquote>
+     This is an unfortunate language mode which we could eventually do away with
+     if we required users of freestanding implementations to annotate this
+     property into their source code.
+
+Because of these issues, some implementations provide extensions for their users
+to disable static or thread local destructors. These extensions are broadly
+useful, but non-portable, and fragment the language to solve what should be a
+simple problem. Standardizing these extensions would benefit the entire C++
+ecosystem.
+
+Proposed Solution {#propsal}
+=================
+
+Add new attributes to enable/disable registration of exit-time destructors of
+static and thread storage duration variables.
+
+The `no_destroy` attribute specifies that a variable with static or thread
+storage duration will not have its exit-time destructor run. It also implies
+that the destructor is not considered *potentially-invoked*, so it isn't
+odr-used, nor is it required to be accessible. For example:
+
+<xmp>
+
+struct widget
+{
+private:
+    ~widget();
+};
+
+[[no_destroy]] widget w; // not an error!
+
+</xmp>
+
+Issue: It was mentioned as part of feedback on r0 that if attributes were
+parsed and ignored, this goes back to being an error, which breaks the expected
+behavior of attributes. It makes sense to make this *potentially-invoked*
+if there's enough desire on the committee.
+
+Issue: Alternatively, we can instead make this a proper keyword (instead of
+an attribute), much like as the `final` keyword.
+
+Conversely, the `always_destroy` attribute specifies that a variable with static
+or thread storage duration should have its exit-time destructor run. This is the
+default behavior and is needed to allow users to opt-out of `no_destroy` when a
+compiler flag makes it the default (or when disabled at module level, see
+[[p1245r0]]).
+
+These attributes currently have an [[Implementation]] in [[Clang]]. This
+proposal is an effort to standardize existing practice.
+
+More background and other possible solutions for this topic can be found in the
+clang mailing list thread [[CFE2016]] and [[CFE2018]]. We considered other
+alternatives as part of the research for this paper. The
+[[#alt|Alternatives]] section provides insights why those solutions
+aren't sufficient.
+
+Alternatives {#alt}
+============
+
+Here is a description of different solutions and why they're inadequate to solve
+this problem.
+
+## `__cxa_atexit` override ## {#atexit}
+
+Some projects currently override `__cxa_atexit` to avoid calling static
+destructors. This outright disables destructor calls for all static variables,
+not just the ones that the programmer has verified are safe. This is also
+non-portable, as `__cxa_atexit` is only present in the Itanium ABI.
+
+## use `std::quick_exit` ## {#quick}
+
+This requires controlling all exit paths from a program, and like the
+[[#atexit|above]] outright disables destructor calls for all static or thread
+variables, not ones that the programmer has verified are safe.
+
+## define a type yourself ## {#type}
+
+For instance, one could define `no_destroy` as a template:
+
+<xmp>
+template <class T> class no_destroy
+{
+    alignas(T) unsigned char data_[sizeof(T)];
+public:
+    template <class... Ts> no_destroy(Ts&&... ts)
+    { new (data_) T(std::forward<Ts>(ts)...); }
+
+    T &get() { return *reinterpret_cast<T *>(data_); }
+};
+
+no_destroy<widget> my_widget;
+
+</xmp>
+
+The class template `no_destroy` disables destruction by circumventing the type
+system, storing the value opaquely in a buffer. This does work, but technically
+has object lifetime issues. This also needlessly inhibits `constexpr`
+initialization, leading to poor performance. `no_destroy` can also disable the
+destructors of variables with automatic storage, which is an unavoidable
+misfeature of this design.
+
+## Use a global reference ## {#reference}
+
+For instance:
+
+<xmp>
+widget&& w = *new widget();
+</xmp>
+
+Like the [[#type|above]], this can work with variables with automatic storage,
+and disables `constexpr` initialization. This also adds needless pointer
+indirection.
+
+Future directions {#future}
+=================
+
+In the future, we could move to make `[[no_destroy]]` the default for variables
+with static or thread storage. After these attributes have been standard for a
+long time, we could deprecate implicit `[[always_destroy]]` on static or thread
+variables with non-trivial destructors, then change the default.
+
+<pre class=biblio>
+{
+    "p1245r0": {
+        "href": "http://wg21.link/p1245r0",
+        "title": "export module containing [[attribute]];",
+        "authors": ["Bruno Cardoso Lopes", "JF Bastien"]
+    },
+    "Clang": {
+        "href": "http://clang.llvm.org/docs/AttributeReference.html#no-destroy",
+        "title": "Attributes in Clang"
+    },
+    "Implementation": {
+        "href": "https://gcc.godbolt.org/z/xCh1jW",
+        "title": "Clang implementation"
+    },
+    "CFE2016": {
+        "href": "http://lists.llvm.org/pipermail/cfe-dev/2016-July/050040.html",
+        "title": "Suppress C++ static destructor registration"
+    },
+    "CFE2018": {
+        "href": "http://lists.llvm.org/pipermail/cfe-dev/2018-July/058494.html",
+        "title": "Suppress C++ static destructor registration, take 2"
+    }
+}
+</pre>
